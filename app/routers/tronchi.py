@@ -7,7 +7,16 @@ from app.schemas.emaildata import EmailData, EmailDataCreate, EmailDataUpdate
 from app.auth.dependencies import get_current_user
 from app.logging_config import setup_logging
 from datetime import datetime
-from typing import List
+
+from app.middlewares.rate_limiter import RateLimiterMiddleware
+
+from app.logging_config import setup_logging
+from datetime import datetime
+from typing import List, Optional
+
+
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
 
 router = APIRouter(prefix="/tronchi", tags=["Tronchi"])
 
@@ -37,6 +46,38 @@ async def create_tronchi(
     db.refresh(db_item)
     logger.info(f"Creato record tronchi con ID {db_item.id} da utente {current_user['username']}")
     return db_item
+
+@router.get("/no-auth", response_model=List[EmailData])
+async def list_tronchi_no_auth(city: Optional[str] = None, db: Session = Depends(get_db)):
+    """
+    Endpoint di test senza autenticazione per tronchi
+    """
+    try:
+        records = db.query(EmailDataModel).filter(EmailDataModel.typo == "tronchi")
+        if city:
+            records = records.filter(EmailDataModel.city.ilike(f"%{city}%"))
+        records = records.all()
+
+        valid_records = [
+            record for record in records
+            if record.latitude is not None and record.longitude is not None
+            and isinstance(record.latitude, str) and isinstance(record.longitude, str)
+            and record.latitude.strip() and record.longitude.strip()
+        ]
+
+        logger.info(f"Recuperati {len(records)} record tronchi (senza autenticazione), "
+                    f"{len(valid_records)} validi dopo il filtraggio")
+        if not valid_records:
+            logger.warning("Nessun record valido trovato dopo il filtraggio")
+            return []
+
+        return valid_records
+    except Exception as e:
+        logger.error(f"Errore nel recupero tronchi senza auth: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Errore interno del server"
+        )
 
 @router.get("/", response_model=List[EmailData])
 async def list_tronchi(

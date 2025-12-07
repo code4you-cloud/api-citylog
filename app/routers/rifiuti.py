@@ -10,7 +10,7 @@ from app.middlewares.rate_limiter import RateLimiterMiddleware
 
 from app.logging_config import setup_logging
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -45,6 +45,44 @@ async def create_rifiuti(
     return db_item
 
 # Versione SENZA autenticazione - PER TESTING
+@router.get("/no-auth", response_model=List[EmailData])
+async def list_rifiuti_no_auth(city: Optional[str] = None, db: Session = Depends(get_db)):
+    """
+    Endpoint di test senza autenticazione
+    """
+    try:
+        # Recupera tutti i record rifiuti (senza filtro utente)
+        records = db.query(EmailDataModel).filter(EmailDataModel.typo == "rifiuti")
+
+        if city:
+            records = records.filter(EmailDataModel.city.ilike(f"%{city}%"))
+        records = records.all()
+        
+        # Filtra i record con latitude/longitude nulli o non validi
+        valid_records = [
+            record for record in records
+            if record.latitude is not None and record.longitude is not None
+            and isinstance(record.latitude, str) and isinstance(record.longitude, str)
+            and record.latitude.strip() and record.longitude.strip()  # Assicura che non siano stringhe vuote
+        ]
+
+        logger.info(f"Recuperati {len(records)} record rifiuti (senza autenticazione), "
+                    f"{len(valid_records)} validi dopo il filtraggio")
+        
+        if not valid_records:
+            logger.warning("Nessun record valido trovato dopo il filtraggio")
+            return []
+
+        return valid_records
+
+    except Exception as e:
+        logger.error(f"Errore nel recupero rifiuti senza auth: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Errore interno del server"
+        )
+
+# Versione SENZA autenticazione - PER TESTING
 @router.get("/no-auth_", response_model=List[EmailData])
 async def list_rifiuti_no_auth(db: Session = Depends(get_db)):
     """
@@ -65,7 +103,7 @@ async def list_rifiuti_no_auth(db: Session = Depends(get_db)):
         )
 
 # Endpoint rifiuti SEMPLIFICATO (senza rate limiting interno)
-@router.get("/no-auth", response_model=List[EmailData])
+@router.get("/no-auth__", response_model=List[EmailData])
 async def list_rifiuti(db: Session = Depends(get_db)):
     # Il rate limiting è gestito dal middleware
     records = db.query(EmailDataModel).filter(

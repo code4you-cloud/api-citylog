@@ -11,38 +11,38 @@ logger = setup_logging()
 # Crea le tabelle del database
 Base.metadata.create_all(bind=engine)
 
+# Crea l'app FastAPI
 app = FastAPI(
     title="FastAPI Project with JWT Auth",
     description="API with authentication, rate limiting, and endpoints for Rifiuti, Ambiente, Strade, Brent",
     version="1.0.0"
 )
 
-# Origini consentite (puoi mettere '*' per tutte)
+# Origini consentite (CORS)
 origins = [
-    "http://localhost",              # sviluppo locale
+    "http://localhost",
     "http://127.0.0.1",
-    "http://192.168.1.159",           # IP locale
-    "https://citylog.cloud",          # dominio Django
-    "https://www.citylog.cloud",          # dominio Django
-    "https://maps.citylog.cloud",          # dominio Django
+    "http://192.168.1.58:4000",
+    "https://citylog.cloud",
+    "https://www.citylog.cloud",
+    "https://maps.citylog.cloud",
     "*",
 ]
 
-# Aggiungi il middleware con limite giornaliero
+# Middleware CORS
 app.add_middleware(
-    RateLimiterMiddleware,
-    #limit=1000,      #richieste
-    #window=86400,    # per 24 ore (86400 secondi)
     CORSMiddleware,
-    allow_origins=origins, # chi può chiamare le API
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"], # GET, POST, PUT, DELETE, ecc.
-    allow_headers=["*"], # tutti gli header
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-app.add_middleware(RateLimiterMiddleware, limit=1000, window=86400)  # limite giornaliero
-app.add_middleware(RateLimiterMiddleware, limit=100, window=60)      # limite minuto
+# Middleware Rate Limiter
+# Limite di 1000 richieste per 24 ore (86400 secondi)
+app.add_middleware(RateLimiterMiddleware, limit=1000, window=86400)
 
+# Includi i router
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(rifiuti.router)
