@@ -36,5 +36,8 @@ class EmailData(EmailDataBase):
     image_time: datetime
     user_id: Optional[int] = None
 
+class FacebookAuthRequest(BaseModel):
+    access_token: str
+
     class Config:
         from_attributes = True

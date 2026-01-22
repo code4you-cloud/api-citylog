@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlalchemy.orm import Session
 from app.db.database import SessionLocal
 from app.models.citylog import EmailData as EmailDataModel
@@ -14,6 +14,7 @@ from typing import List, Optional
 
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
+
 
 router = APIRouter(prefix="/rifiuti", tags=["Rifiuti"])
 
@@ -204,6 +205,41 @@ async def delete_rifiuti(
     db.commit()
     logger.info(f"Eliminato record rifiuti ID {id} da utente {current_user['username']}")
 
-
-
-
+@router.get("/record/", response_model=EmailData)
+async def get_single_rifiuto(
+    latitude: str,
+    longitude: str,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    db_user = db.query(UserModel).filter(UserModel.email == current_user["username"]).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="Utente non trovato")
+    
+    # Cerca il record specifico
+    query = db.query(EmailDataModel).filter(
+        EmailDataModel.typo == "rifiuti",
+        EmailDataModel.latitude == latitude,
+        EmailDataModel.longitude == longitude
+    )
+    
+    # Applica le regole di accesso
+    user_has_records = db.query(EmailDataModel).filter(
+        EmailDataModel.user_id == db_user.id,
+        EmailDataModel.typo == "rifiuti"
+    ).first() is not None
+    
+    if user_has_records:
+        query = query.filter(EmailDataModel.user_id == db_user.id)
+    else:
+        query = query.filter(EmailDataModel.user_id.is_(None))
+    
+    record = query.first()
+    
+    if not record:
+        raise HTTPException(
+            status_code=404,
+            detail="Record non trovato o accesso non autorizzato"
+        )
+    
+    return record
