@@ -16,6 +16,7 @@ app = FastAPI(
     title="FastAPI Project with JWT Auth",
     description="API with authentication, rate limiting, and endpoints for Rifiuti, Ambiente, Strade, Brent",
     version="1.0.0"
+    #redirect_slashes=False
 )
 
 # Origini consentite (CORS)
@@ -50,6 +51,15 @@ app.include_router(tronchi.router)
 app.include_router(censimento.router)
 app.include_router(piantumazioni.router)
 app.include_router(strade.router)
+
+@app.get("/", tags=["Root", "Health"])
+def root():
+    return {
+        "message": "Welcome to CityLog API",
+        "docs": "/docs",
+        "status": "online",
+        "version": app.version  # opzionale, usa la versione dell'app
+    }
 
 # Log di avvio
 logger.info("Applicazione FastAPI avviata")

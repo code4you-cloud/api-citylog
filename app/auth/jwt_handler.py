@@ -4,7 +4,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
 
-SECRET_KEY = "your-secret-key-change-in-production"
+SECRET_KEY = "ju1rzFL2SsuqjWJta_JHdEwjZLly4RyTXKocHB7kpvw"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
