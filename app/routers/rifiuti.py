@@ -1,6 +1,7 @@
 import re
 import os
 import requests
+import asyncio
 
 from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlalchemy.orm import Session
@@ -27,7 +28,7 @@ from urllib.parse import urlparse
 # COSTANTI GLOBALI
 # -----------------------------
 
-FLASK_DELETE_ENDPOINT = "http://ws2.citylog.cloud/upload/delete"  # Cambia con URL corretto server Flask
+FLASK_DELETE_ENDPOINT = "http://ws.citylog.cloud/upload/delete"  # Cambia con URL corretto server Flask
 #FLASK_DELETE_ENDPOINT = "http://192.168.1.43:9000/upload/delete"  # Cambia con URL corretto server Flask
 
 router = APIRouter(prefix="/rifiuti", tags=["Rifiuti"])
@@ -195,6 +196,7 @@ async def update_rifiuti(
     logger.info(f"Aggiornato record rifiuti ID {id} da utente {current_user['username']}")
     return db_item
 
+
 @router.delete("/{id}", status_code=status.HTTP_200_OK)
 async def delete_rifiuti(
     id: int,
@@ -222,8 +224,11 @@ async def delete_rifiuti(
     delete_file_success = False
     if db_item.image_url:
         filename = os.path.basename(db_item.image_url)
+        remote_path = f"uploaded_images/{filename}"
         try:
-            flask_resp = requests.delete(f"{FLASK_DELETE_ENDPOINT}/{filename}", timeout=10)
+            flask_resp = requests.delete(f"{FLASK_DELETE_ENDPOINT}/{remote_path}", timeout=10)
+            #flask_resp = requests.delete(f"{FLASK_DELETE_ENDPOINT}/{filename}", timeout=10)
+            logger.info(f"ENDPOINT FINALE DI DELETE:{FLASK_DELETE_ENDPOINT}/{remote_path}")
             if flask_resp.status_code == 200:
                 delete_file_success = True
                 logger.info(f"File remoto '{filename}' eliminato correttamente tramite Flask")
