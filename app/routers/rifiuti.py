@@ -49,11 +49,20 @@ async def create_rifiuti(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    db_user = db.query(UserModel).filter(UserModel.email == current_user["username"]).first()
-    if not db_user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utente non trovato")
+    db_user = db.query(UserModel).filter(
+            UserModel.email == current_user["username"]
+            ).first()
 
-    db_item = EmailDataModel(**item.dict(), typo="rifiuti", user_id=db_user.id)
+    if not db_user:
+        raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, 
+                detail="Utente non trovato")
+
+    db_item = EmailDataModel(
+            **item.dict(exclude={"typo", "user_id", "id", "image_time"}), 
+            typo="rifiuti", 
+            user_id=db_user.id)
+
     db.add(db_item)
     db.commit()
     db.refresh(db_item)

@@ -168,3 +168,10 @@ async def facebook_auth(
             "email": user.email
         }
     }
+
+@router.post("/auth/service-login")
+def service_login():
+    access_token = create_access_token(
+        data={"id": "999", "username": "service", "email": "django@citylog.local"}
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
