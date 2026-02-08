@@ -17,7 +17,15 @@ class EmailDataBase(BaseModel):
     user_id: Optional[int] = None
 
 class EmailDataCreate(EmailDataBase):
-    pass
+    latitude: Optional[str] = None
+    longitude: Optional[str] = None
+    city: Optional[str] = None
+    address: Optional[str] = None
+    image_id: Optional[str] = None
+    image_url: Optional[str] = None
+    image_file: Optional[str] = None
+    status: Optional[str] = None
+    #pass
 
 class EmailDataUpdate(BaseModel):  # Nuovo schema per PUT (aggiornamenti parziali)
     latitude: Optional[str] = None
