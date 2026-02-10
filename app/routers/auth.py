@@ -15,6 +15,8 @@ from sqlalchemy.orm import Session
 from app.auth.jwt_handler import verify_password, get_password_hash
 from app.schemas.emaildata import FacebookAuthRequest
 
+from app.auth.jwt_handler import SECRET_KEY, ALGORITHM
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Authentication"])
@@ -32,6 +34,32 @@ def get_db():
         db.close()
 
 @router.post("/auth/token")
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+
+    logger.warning(f"SECRET CREATE -> {SECRET_KEY}")
+    logger.warning(f"CREATE ALG -> {ALGORITHM}")
+
+    user = db.query(UserModel).filter(
+        UserModel.email == form_data.username
+    ).first()
+
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid credentials")
+
+    if not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Invalid credentials")
+
+    access_token = create_access_token(
+        data={
+            "id": user.id,
+            "username": user.username,
+            "email": user.email
+        }
+    )
+
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@router.post("/auth/token_")
 async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)

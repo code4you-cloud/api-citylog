@@ -49,6 +49,36 @@ async def create_rifiuti(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    user_id = current_user.get("id")
+
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token non valido"
+        )
+
+    db_item = EmailDataModel(
+        **item.dict(exclude={"typo", "user_id", "id", "image_time"}),
+        typo="rifiuti",
+        user_id=user_id
+    )
+
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+
+    logger.info(
+        f"Creato record rifiuti con ID {db_item.id} da utente {current_user.get('email')}"
+    )
+
+    return db_item
+
+@router.post("/__", response_model=EmailData, status_code=status.HTTP_201_CREATED)
+async def create_rifiuti(
+    item: EmailDataCreate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     db_user = db.query(UserModel).filter(
             UserModel.email == current_user["username"]
             ).first()
@@ -153,7 +183,7 @@ async def list_rifiuti(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    db_user = db.query(UserModel).filter(UserModel.email == current_user["username"]).first()
+    db_user = db.query(UserModel).filter(UserModel.email == current_user["email"]).first()
     if not db_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utente non trovato")
 
