@@ -59,26 +59,16 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 
     return {"access_token": access_token, "token_type": "bearer"}
 
-@router.post("/auth/token_")
-async def login(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db)
-):
-    user = db.query(UserModel).filter(UserModel.email == form_data.username).first()
-    if not user or not verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
 
-    access_token_expires = timedelta(minutes=30)
-    access_token = create_access_token(
-        data={"sub": user.email},
-        expires_delta=access_token_expires
-    )
-    return {"access_token": access_token, "token_type": "bearer"}
+# ritona .id della tabella Users interrogando il facebook:id 
+@router.get("/facebook/{facebook_id}")
+def get_user_by_facebook(facebook_id: str, db: Session = Depends(get_db)):
+    user = db.query(UserModel).filter(UserModel.facebook_id == facebook_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"id": user.id}
 
+# Ritorna akcune informazioni dell'utente facebook ma richiede JWT
 @router.get("/auth/me")
 async def read_current_user(current_user: dict = Depends(get_current_user)):
     return current_user

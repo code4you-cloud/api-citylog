@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.db.database import SessionLocal
 from app.models.citylog import EmailData as EmailDataModel
 from app.models.user import User as UserModel
-from app.schemas.emaildata import EmailData, EmailDataCreate, EmailDataUpdate
+from app.schemas.emaildata import EmailData, EmailDataCreate, EmailDataUpdate, EmailDataPublic
 from app.auth.dependencies import get_current_user
 
 from app.middlewares.rate_limiter import RateLimiterMiddleware
@@ -202,6 +202,17 @@ async def list_rifiuti(
 
     logger.info(f"Recuperati {len(user_records)} record rifiuti per utente {current_user['username']}")
     return user_records
+
+
+# Public endpoint to get rifiuti/waste
+@router.get("/public/rifiuti", response_model=List[EmailDataPublic])
+async def public_rifiuti(
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
+    return db.query(EmailDataModel).filter(
+        EmailDataModel.typo == "rifiuti"
+    ).limit(limit).all()
 
 @router.put("/{id}", response_model=EmailData)
 async def update_rifiuti(
