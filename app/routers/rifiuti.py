@@ -253,6 +253,33 @@ async def delete_rifiuti(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+
+    # 1. Recupera record rifiuti
+    db_item = db.query(EmailDataModel).filter(
+        EmailDataModel.id == id,
+        EmailDataModel.typo == "rifiuti"
+    ).first()
+
+    if not db_item:
+        raise HTTPException(status_code=404, detail="Record non trovato")
+
+    # 2. Controlla autorizzazione
+    if db_item.user_id != int(current_user["sub"]):
+        raise HTTPException(status_code=403, detail="Non autorizzato")
+
+    # 3. Cancella record
+    db.delete(db_item)
+    db.commit()
+
+    return {"detail": f"Record ID {id} cancellato"}
+
+
+@router.delete("/{id__}", status_code=status.HTTP_200_OK)
+async def delete_rifiuti(
+    id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     # 1.Recupera utente
     db_user = db.query(UserModel).filter(UserModel.email == current_user["username"]).first()
     if not db_user:
