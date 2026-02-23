@@ -17,7 +17,15 @@ class EmailDataBase(BaseModel):
     user_id: Optional[int] = None
 
 class EmailDataCreate(EmailDataBase):
-    pass
+    latitude: Optional[str] = None
+    longitude: Optional[str] = None
+    city: Optional[str] = None
+    address: Optional[str] = None
+    image_id: Optional[str] = None
+    image_url: Optional[str] = None
+    image_file: Optional[str] = None
+    status: Optional[str] = None
+    #pass
 
 class EmailDataUpdate(BaseModel):  # Nuovo schema per PUT (aggiornamenti parziali)
     latitude: Optional[str] = None
@@ -35,6 +43,32 @@ class EmailData(EmailDataBase):
     id: int
     image_time: datetime
     user_id: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+class EmailDataPublic(BaseModel):
+    id: int
+    latitude: Optional[str] = None
+    longitude: Optional[str] = None
+    city: Optional[str] = None
+    address: Optional[str] = None
+    image_time: Optional[datetime] = None
+    status: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+class SegnalazioneOut(BaseModel):
+    id: int
+    typo: Optional[str] = None
+    address: Optional[str] = None
+    immage_url: Optional[str] = None
+    image_time: datetime
+    user_id: int
+
+    class Config:
+        from_attributes = True
 
 class FacebookAuthRequest(BaseModel):
     access_token: str

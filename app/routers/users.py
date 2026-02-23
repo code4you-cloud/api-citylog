@@ -6,6 +6,10 @@ from app.schemas.user import UserCreate, User
 from app.auth.dependencies import get_current_user
 from app.auth.jwt_handler import get_password_hash
 
+#from app.database import get_db
+from app.models.citylog import EmailData as EmailDataModel
+from app.schemas.emaildata import SegnalazioneOut
+
 router = APIRouter(prefix="/users", tags=["Users"])
 
 def get_db():
@@ -47,3 +51,17 @@ async def read_current_user(
             detail="User not found"
         )
     return db_user
+
+@router.get("/me/segnalazioni", response_model=list[SegnalazioneOut])
+def get_my_segnalazioni(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    segnalazioni = (
+        db.query(EmailDataModel)
+        .filter(EmailDataModel.user_id == current_user['id'])
+        .order_by(EmailDataModel.image_time.desc())
+        .all()
+    )
+
+    return segnalazioni
