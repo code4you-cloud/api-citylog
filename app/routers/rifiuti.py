@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.db.database import SessionLocal
 from app.models.citylog import EmailData as EmailDataModel
 from app.models.user import User as UserModel
-from app.schemas.emaildata import EmailData, EmailDataCreate, EmailDataUpdate
+from app.schemas.emaildata import EmailData, EmailDataCreate, EmailDataUpdate, EmailDataPublic
 from app.auth.dependencies import get_current_user
 
 from app.middlewares.rate_limiter import RateLimiterMiddleware
@@ -44,6 +44,36 @@ def get_db():
         db.close()
 
 @router.post("/", response_model=EmailData, status_code=status.HTTP_201_CREATED)
+async def create_rifiuti(
+    item: EmailDataCreate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    user_id = current_user.get("id")
+
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token non valido"
+        )
+
+    db_item = EmailDataModel(
+        **item.dict(exclude={"typo", "user_id", "id", "image_time"}),
+        typo="rifiuti",
+        user_id=user_id
+    )
+
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+
+    logger.info(
+        f"Creato record rifiuti con ID {db_item.id} da utente {current_user.get('email')}"
+    )
+
+    return db_item
+
+@router.post("/__", response_model=EmailData, status_code=status.HTTP_201_CREATED)
 async def create_rifiuti(
     item: EmailDataCreate,
     current_user: dict = Depends(get_current_user),
@@ -153,7 +183,7 @@ async def list_rifiuti(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    db_user = db.query(UserModel).filter(UserModel.email == current_user["username"]).first()
+    db_user = db.query(UserModel).filter(UserModel.email == current_user["email"]).first()
     if not db_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utente non trovato")
 
@@ -172,6 +202,17 @@ async def list_rifiuti(
 
     logger.info(f"Recuperati {len(user_records)} record rifiuti per utente {current_user['username']}")
     return user_records
+
+
+# Public endpoint to get rifiuti/waste
+@router.get("/public/rifiuti", response_model=List[EmailDataPublic])
+async def public_rifiuti(
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
+    return db.query(EmailDataModel).filter(
+        EmailDataModel.typo == "rifiuti"
+    ).limit(limit).all()
 
 @router.put("/{id}", response_model=EmailData)
 async def update_rifiuti(
@@ -207,6 +248,33 @@ async def update_rifiuti(
 
 
 @router.delete("/{id}", status_code=status.HTTP_200_OK)
+async def delete_rifiuti(
+    id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    # 1. Recupera record rifiuti
+    db_item = db.query(EmailDataModel).filter(
+        EmailDataModel.id == id,
+        EmailDataModel.typo == "rifiuti"
+    ).first()
+
+    if not db_item:
+        raise HTTPException(status_code=404, detail="Record non trovato")
+
+    # 2. Controlla autorizzazione
+    if db_item.user_id != int(current_user["sub"]):
+        raise HTTPException(status_code=403, detail="Non autorizzato")
+
+    # 3. Cancella record
+    db.delete(db_item)
+    db.commit()
+
+    return {"detail": f"Record ID {id} cancellato"}
+
+
+@router.delete("/{id__}", status_code=status.HTTP_200_OK)
 async def delete_rifiuti(
     id: int,
     current_user: dict = Depends(get_current_user),

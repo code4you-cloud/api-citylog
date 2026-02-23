@@ -2,7 +2,7 @@
 # Usage: make <target>
 
 # Configurazione
-API_BASE = http://192.168.1.159:3000
+API_BASE = https://api.citylog.cloud
 USERNAME = apollo@example.com
 PASSWORD = 1234
 SESSION_FILE = api_session.json

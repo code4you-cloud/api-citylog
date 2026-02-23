@@ -44,6 +44,32 @@ class EmailData(EmailDataBase):
     image_time: datetime
     user_id: Optional[int] = None
 
+    class Config:
+        from_attributes = True
+
+class EmailDataPublic(BaseModel):
+    id: int
+    latitude: Optional[str] = None
+    longitude: Optional[str] = None
+    city: Optional[str] = None
+    address: Optional[str] = None
+    image_time: Optional[datetime] = None
+    status: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+class SegnalazioneOut(BaseModel):
+    id: int
+    typo: Optional[str] = None
+    address: Optional[str] = None
+    immage_url: Optional[str] = None
+    image_time: datetime
+    user_id: int
+
+    class Config:
+        from_attributes = True
+
 class FacebookAuthRequest(BaseModel):
     access_token: str
 
