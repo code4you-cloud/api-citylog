@@ -59,7 +59,7 @@ def get_my_segnalazioni(
 ):
     segnalazioni = (
         db.query(EmailDataModel)
-        .filter(EmailDataModel.user_id == current_user['id'])
+        .filter(EmailDataModel.user_id == current_user['sub'])
         .order_by(EmailDataModel.image_time.desc())
         .all()
     )
