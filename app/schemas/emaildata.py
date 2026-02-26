@@ -59,11 +59,8 @@ class EmailDataPublic(BaseModel):
     class Config:
         from_attributes = True
 
-class SegnalazioneOut(BaseModel):
+class SegnalazioneOut(EmailDataBase):
     id: int
-    typo: Optional[str] = None
-    address: Optional[str] = None
-    immage_url: Optional[str] = None
     image_time: datetime
     user_id: int
 
