@@ -28,7 +28,7 @@ from urllib.parse import urlparse
 # COSTANTI GLOBALI
 # -----------------------------
 
-FLASK_DELETE_ENDPOINT = "http://ws.citylog.cloud/upload/delete"  # Cambia con URL corretto server Flask
+FLASK_DELETE_ENDPOINT = "https://ws.citylog.cloud/upload/delete"  # Cambia con URL corretto server Flask
 #FLASK_DELETE_ENDPOINT = "http://192.168.1.43:9000/upload/delete"  # Cambia con URL corretto server Flask
 
 router = APIRouter(prefix="/rifiuti", tags=["Rifiuti"])
@@ -73,32 +73,6 @@ async def create_rifiuti(
 
     return db_item
 
-@router.post("/__", response_model=EmailData, status_code=status.HTTP_201_CREATED)
-async def create_rifiuti(
-    item: EmailDataCreate,
-    current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    db_user = db.query(UserModel).filter(
-            UserModel.email == current_user["username"]
-            ).first()
-
-    if not db_user:
-        raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, 
-                detail="Utente non trovato")
-
-    db_item = EmailDataModel(
-            **item.dict(exclude={"typo", "user_id", "id", "image_time"}), 
-            typo="rifiuti", 
-            user_id=db_user.id)
-
-    db.add(db_item)
-    db.commit()
-    db.refresh(db_item)
-    logger.info(f"Creato record rifiuti con ID {db_item.id} da utente {current_user['username']}")
-    return db_item
-
 # Versione SENZA autenticazione - PER TESTING
 @router.get("/no-auth", response_model=List[EmailData])
 async def list_rifiuti_no_auth(city: Optional[str] = None, db: Session = Depends(get_db)):
@@ -136,47 +110,6 @@ async def list_rifiuti_no_auth(city: Optional[str] = None, db: Session = Depends
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Errore interno del server"
         )
-
-# Versione SENZA autenticazione - PER TESTING
-@router.get("/no-auth_", response_model=List[EmailData])
-async def list_rifiuti_no_auth(db: Session = Depends(get_db)):
-    """
-    Endpoint di test senza autenticazione
-    """
-    try:
-        # Recupera tutti i record rifiuti (senza filtro utente)
-        records = db.query(EmailDataModel).filter(EmailDataModel.typo == "rifiuti").all()
-
-        logger.info(f"Recuperati {len(records)} record rifiuti (senza autenticazione)")
-        return records
-
-    except Exception as e:
-        logger.error(f"Errore nel recupero rifiuti senza auth: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Errore interno del server"
-        )
-
-# Endpoint rifiuti SEMPLIFICATO (senza rate limiting interno)
-@router.get("/no-auth__", response_model=List[EmailData])
-async def list_rifiuti(db: Session = Depends(get_db)):
-    # Il rate limiting è gestito dal middleware
-    records = db.query(EmailDataModel).filter(
-        EmailDataModel.typo == "rifiuti",
-        EmailDataModel.user_id.is_(None)
-    ).all()
-
-    return records
-
-#@router.get("/complete", response_model=List[EmailData])
-#async def listrifiuti_public(db: Session = Depends(get_db)):
-#    """Endpoint pubblico per recuperare dati rifiuti"""
-#    records = db.query(EmailDataModel).filter(
-#        EmailDataModel.typo == "rifiuti"
-#        #EmailDataModel.is_public == True  # Aggiungi campo per dati pubblici
-#    ).all()
-#    return records
-#
 
 @router.get("/", response_model=List[EmailData])
 async def list_rifiuti(
@@ -254,7 +187,6 @@ async def delete_rifiuti(
     db: Session = Depends(get_db)
 ):
 
-    # 1. Recupera record rifiuti
     db_item = db.query(EmailDataModel).filter(
         EmailDataModel.id == id,
         EmailDataModel.typo == "rifiuti"
@@ -263,67 +195,40 @@ async def delete_rifiuti(
     if not db_item:
         raise HTTPException(status_code=404, detail="Record non trovato")
 
-    # 2. Controlla autorizzazione
     if db_item.user_id != int(current_user["sub"]):
         raise HTTPException(status_code=403, detail="Non autorizzato")
 
-    # 3. Cancella record
+    # Delete remote file
+    if db_item.image_url:
+        filename = os.path.basename(db_item.image_url)
+        remote_path = f"uploaded_images/{os.path.basename(db_item.image_url)}"
+        delete_url = f"{FLASK_DELETE_ENDPOINT}/{remote_path}"
+        #remote_path = f"uploaded_images/{filename}"
+
+        try:
+            logger.info(f"DELETE URL: {delete_url}")
+            logger.info(f"FLASK_DELETE_ENDPOINT: {FLASK_DELETE_ENDPOINT}")
+            flask_resp = requests.delete(
+                f"{FLASK_DELETE_ENDPOINT}/{remote_path}",
+                timeout=10
+            )
+
+            if flask_resp.status_code != 200:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Errore eliminazione file remoto"
+                )
+
+        except requests.RequestException:
+            raise HTTPException(
+                status_code=500,
+                detail="Errore comunicazione server file"
+            )
+
     db.delete(db_item)
     db.commit()
 
     return {"detail": f"Record ID {id} cancellato"}
-
-
-@router.delete("/{id__}", status_code=status.HTTP_200_OK)
-async def delete_rifiuti(
-    id: int,
-    current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    # 1.Recupera utente
-    db_user = db.query(UserModel).filter(UserModel.email == current_user["username"]).first()
-    if not db_user:
-        logger.warning(f"Utente {current_user['username']} non trovato per eliminazione record rifiuti ID {id}")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utente non trovato")
-
-    # 2.Recupera record rifiuti
-    db_item = db.query(EmailDataModel).filter(EmailDataModel.id == id, EmailDataModel.typo == "rifiuti").first()
-    if not db_item:
-        logger.warning(f"Record rifiuti ID {id} non trovato per eliminazione da utente {current_user['username']}")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Record non trovato")
-
-    # 3.Controlla autorizzazione
-    if db_item.user_id is not None and db_item.user_id != db_user.id:
-        logger.warning(f"Utente {current_user['username']} non autorizzato a eliminare record rifiuti ID {id}")
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Non autorizzato")
-
-    # 4.Cancella fisicamente il file tramite endpoint Flask
-    delete_file_success = False
-    if db_item.image_url:
-        filename = os.path.basename(db_item.image_url)
-        remote_path = f"uploaded_images/{filename}"
-        try:
-            flask_resp = requests.delete(f"{FLASK_DELETE_ENDPOINT}/{remote_path}", timeout=10)
-            #flask_resp = requests.delete(f"{FLASK_DELETE_ENDPOINT}/{filename}", timeout=10)
-            logger.info(f"ENDPOINT FINALE DI DELETE:{FLASK_DELETE_ENDPOINT}/{remote_path}")
-            if flask_resp.status_code == 200:
-                delete_file_success = True
-                logger.info(f"File remoto '{filename}' eliminato correttamente tramite Flask")
-            else:
-                logger.warning(f"Fallita cancellazione file remoto '{filename}' tramite Flask. Status: {flask_resp.status_code}")
-        except requests.RequestException as e:
-            logger.error(f"Errore nella richiesta DELETE verso Flask per file '{filename}': {e}")
-
-    # 5. Cancella record dal DB
-    db.delete(db_item)
-    db.commit()
-    logger.info(f"Record rifiuti ID {id} eliminato da utente {current_user['username']}")
-
-    # 6. Restituisce messaggio chiaro
-    return {
-        "detail": f"Record ID {id} cancellato dal database" +
-                  (", file fisico eliminato con successo" if delete_file_success else ", ma file fisico non eliminato")
-    }
 
 @router.get("/legacy/resolve-image-id")
 async def resolve_image_id_from_filename(
