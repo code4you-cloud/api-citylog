@@ -55,7 +55,7 @@ async def read_current_user(
 @router.get("/me/segnalazioni", response_model=list[SegnalazioneOut])
 def get_my_segnalazioni(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)
 ):
     segnalazioni = (
         db.query(EmailDataModel)
@@ -63,5 +63,4 @@ def get_my_segnalazioni(
         .order_by(EmailDataModel.image_time.desc())
         .all()
     )
-
     return segnalazioni
