@@ -55,13 +55,16 @@ async def read_current_user(
 @router.get("/me/segnalazioni", response_model=list[SegnalazioneOut])
 def get_my_segnalazioni(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)
 ):
+    user_id = current_user.get('id') or current_user.get('sub')
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Token non valido")
+
     segnalazioni = (
         db.query(EmailDataModel)
-        .filter(EmailDataModel.user_id == current_user['sub'])
+        .filter(EmailDataModel.user_id == user_id)
         .order_by(EmailDataModel.image_time.desc())
         .all()
     )
-
     return segnalazioni
