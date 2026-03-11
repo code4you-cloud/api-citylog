@@ -123,52 +123,38 @@ async def update_segnalazione_status(
 
     return db_item
 
-@router.delete("/{id}", status_code=status.HTTP_200_OK)
-async def delete_segnalazioni(
+@router.put("/{id}")
+async def update_segnalazione_status(
     id: int,
+    status_update: SegnalazioneStatusUpdate,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
 
+    logger.info(f"CURRENT USER: {current_user}")
+    logger.info(f"STATUS UPDATE: {status_update}")
+
+    # recupero user_id dal token JWT
+    user_id = int(current_user["sub"])
+
+    # recupero segnalazione solo se appartiene all'utente
     db_item = db.query(EmailDataModel).filter(
         EmailDataModel.id == id,
-        EmailDataModel.typo == "rifiuti"
+        EmailDataModel.user_id == user_id
     ).first()
 
     if not db_item:
-        raise HTTPException(status_code=404, detail="Record non trovato")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Segnalazione non trovata o non autorizzata"
+        )
 
-    if db_item.user_id != int(current_user["sub"]):
-        raise HTTPException(status_code=403, detail="Non autorizzato")
+    # aggiornamento status
+    db_item.status = status_update.status
 
-    # Delete remote file
-    if db_item.image_url:
-        filename = os.path.basename(db_item.image_url)
-        remote_path = f"uploaded_images/{os.path.basename(db_item.image_url)}"
-        delete_url = f"{FLASK_DELETE_ENDPOINT}/{remote_path}"
-        #remote_path = f"uploaded_images/{filename}"
-
-        try:
-            logger.info(f"DELETE URL: {delete_url}")
-            logger.info(f"FLASK_DELETE_ENDPOINT: {FLASK_DELETE_ENDPOINT}")
-            flask_resp = requests.delete(
-                f"{FLASK_DELETE_ENDPOINT}/{remote_path}",
-                timeout=10
-            )
-
-            if flask_resp.status_code != 200:
-                raise HTTPException(
-                    status_code=500,
-                    detail="Errore eliminazione file remoto"
-                )
-
-        except requests.RequestException:
-            raise HTTPException(
-                status_code=500,
-                detail="Errore comunicazione server file"
-            )
-
-    db.delete(db_item)
     db.commit()
+    db.refresh(db_item)
 
-    return {"detail": f"Record ID {id} cancellato"}
+    logger.info(f"Segnalazione {id} aggiornata a status {status_update.status} da utente {user_id}")
+
+    return db_item
