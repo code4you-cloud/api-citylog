@@ -39,6 +39,9 @@ class EmailDataUpdate(BaseModel):  # Nuovo schema per PUT (aggiornamenti parzial
     typo: Optional[str] = None
     # Non includere typo, id, user_id, image_time (non modificabili)
 
+class SegnalazioneStatusUpdate(BaseModel):
+    status: Optional[str] = None
+
 class EmailData(EmailDataBase):
     id: int
     image_time: datetime

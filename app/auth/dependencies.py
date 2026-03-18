@@ -20,6 +20,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         logger.info(f"VERIFY ALG -> {ALGORITHM}")
         logger.info(f"JWT OK -> {payload}")
         logger.info(f"TOKEN ARRIVATO {token}")
+        logger.info(f"PAYLOAD {payload}")
         return payload
         #username: str = payload.get("sub")
         #if username is None:
@@ -30,5 +31,6 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         logger.warning(f"SECRET VERIFY -> {SECRET_KEY}")
         logger.warning(f"VERIFY ALG -> {ALGORITHM}")
         logger.warning(f"TOKEN JWTError -> {token}")
+        #logger.warning(f"PAYLOAD -> {payload}")
         raise HTTPException(status_code=401, detail="Invalid token")
         #raise credentials_exception
