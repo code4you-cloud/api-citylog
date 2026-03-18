@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.routers import auth, users, rifiuti, tronchi, censimento, piantumazioni, strade
+from app.routers import auth, users, rifiuti, tronchi, censimento, piantumazioni, strade, segnalazioni
 from app.middlewares.rate_limiter import RateLimiterMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from app.db.database import Base, engine
@@ -13,8 +13,8 @@ Base.metadata.create_all(bind=engine)
 
 # Crea l'app FastAPI
 app = FastAPI(
-    title="FastAPI Project with JWT Auth",
-    description="API with authentication, rate limiting, and endpoints for Rifiuti, Ambiente, Strade, Brent",
+    title="FastAPI Project Citylog with JWT Auth",
+    description="API with authentication, rate limiting, endpoints for Rifiuti, Ambiente, Strade, Piantumazioni etc",
     version="1.0.0"
     #redirect_slashes=False
 )
@@ -46,6 +46,7 @@ app.add_middleware(RateLimiterMiddleware, limit=1000, window=86400)
 # Includi i router
 app.include_router(auth.router)
 app.include_router(users.router)
+app.include_router(segnalazioni.router)
 app.include_router(rifiuti.router)
 app.include_router(tronchi.router)
 app.include_router(censimento.router)
