@@ -3,7 +3,7 @@ import os
 import requests
 import asyncio
 
-from fastapi import APIRouter, Depends, HTTPException, status, Body
+from fastapi import APIRouter, Depends, HTTPException, status, Body, Path
 from sqlalchemy.orm import Session
 from app.db.database import SessionLocal
 from app.models.citylog import EmailData as EmailDataModel
@@ -89,41 +89,67 @@ async def get_segnalazione(
 
     return record
 
-@router.put("/{id}", response_model=EmailData)
-async def update_segnalazione_status(
+@router.delete("/{id}")
+async def delete_segnalazione(
     id: int,
-    status_update: SegnalazioneStatusUpdate,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    db_user = db.query(UserModel).filter(
-        UserModel.email == current_user["username"]
-    ).first()
 
-    if not db_user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Utente non trovato"
-        )
+    user_id = int(current_user["sub"])
 
     db_item = db.query(EmailDataModel).filter(
         EmailDataModel.id == id,
-        EmailDataModel.user_id == db_user.id
+        EmailDataModel.user_id == user_id
+    ).first()
+
+    if not db_item:
+        raise HTTPException(
+            status_code=404,
+            detail="Segnalazione non trovata"
+        )
+
+    db.delete(db_item)
+    db.commit()
+
+    return {"message": "Segnalazione eliminata"}
+
+@router.put("/{id}")
+async def update_segnalazione_status(
+    id: int = Path(..., description="ID della segnalazione"),
+    status_update: SegnalazioneStatusUpdate = Body(...),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    logger.info(f"CURRENT USER: {current_user}")
+    logger.info(f"STATUS UPDATE: {status_update}")
+
+    user_id = int(current_user["sub"])
+
+    db_item = db.query(EmailDataModel).filter(
+        EmailDataModel.id == id,
+        EmailDataModel.user_id == user_id
     ).first()
 
     if not db_item:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Segnalazione non trovata"
+            detail="Segnalazione non trovata o non autorizzata"
         )
 
     db_item.status = status_update.status
+
     db.commit()
     db.refresh(db_item)
 
+    logger.info(
+        f"Segnalazione {id} aggiornata a status {status_update.status} da utente {user_id}"
+    )
+
     return db_item
 
-@router.put("/{id}")
+@router.put("/{id__}")
 async def update_segnalazione_status(
     id: int,
     status_update: SegnalazioneStatusUpdate,
