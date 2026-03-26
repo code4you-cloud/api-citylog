@@ -2,7 +2,7 @@ import logging
 import requests
 
 from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status,Body
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from fastapi.security import OAuth2PasswordRequestForm
 from app.auth.jwt_handler import create_access_token
 from app.auth.dependencies import get_current_user
@@ -11,11 +11,14 @@ from app.models.user import User as UserModel
 from app.auth.jwt_handler import verify_password
 from sqlalchemy.orm import Session
 
-
 from app.auth.jwt_handler import verify_password, get_password_hash
-from app.schemas.emaildata import FacebookAuthRequest
+from app.schemas.emaildata import FacebookAuthRequest, GoogleAuthRequest
 
 from app.auth.jwt_handler import SECRET_KEY, ALGORITHM
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
+
+from google.auth import exceptions as google_exceptions
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +28,8 @@ router = APIRouter(tags=["Authentication"])
 FB_APP_ID = "your-facebook-app-id"
 FB_APP_SECRET = "your-facebook-app-secret"
 
+
+GOOGLE_CLIENT_ID = "652122113566-qp62kct9opufkbf2o3f53kdch48c0vm7.apps.googleusercontent.com"
 
 def get_db():
     db = SessionLocal()
@@ -193,3 +198,60 @@ def service_login():
         data={"id": "999", "username": "service", "email": "django@citylog.local"}
     )
     return {"access_token": access_token, "token_type": "bearer"}
+
+@router.post("/auth/google")
+def google_auth(data: GoogleAuthRequest):
+    try:
+        idinfo = id_token.verify_oauth2_token(
+            data.google_token,
+            google_requests.Request(),
+            GOOGLE_CLIENT_ID
+        )
+        email = idinfo.get("email")
+        name = idinfo.get("name")
+        google_id = idinfo.get("sub")
+        user = get_or_create_user(email, google_id, name)
+        app_token = create_app_token(user)
+        return {
+            "status": "ok",
+            "token": app_token,
+            "user": {"email": email, "name": name}
+        }
+    except ValueError:
+        # token malformato, scaduto, audience errata
+        raise HTTPException(status_code=401, detail="Token non valido")
+    except google_exceptions.TransportError:
+        # Google irraggiungibile durante la verifica
+        raise HTTPException(status_code=503, detail="Servizio Google non disponibile")
+    except requests.exceptions.RequestException:
+        # fallback generico di rete
+        raise HTTPException(status_code=503, detail="Errore di rete")
+
+@router.post("/auth/google_")
+def google_auth(data: GoogleAuthRequest):
+
+    try:
+        idinfo = id_token.verify_oauth2_token(
+            data.google_token,
+            requests.Request(),
+            GOOGLE_CLIENT_ID
+        )
+
+        email = idinfo.get("email")
+        name = idinfo.get("name")
+        google_id = idinfo.get("sub")
+
+        user = get_or_create_user(email, google_id, name)
+        app_token = create_app_token(user)
+
+        return {
+            "status": "ok",
+            "token": app_token,
+            "user": {
+                "email": email,
+                "name": name
+            }
+        }
+
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Token non valido")
