@@ -44,7 +44,7 @@ class SegnalazioneStatusUpdate(BaseModel):
 
 class GoogleAuthRequest(BaseModel):
     provider: Optional[str] = None
-    token: Optional[str] = None
+    google_token: str
 
 class EmailData(EmailDataBase):
     id: int

@@ -21,6 +21,9 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         logger.info(f"JWT OK -> {payload}")
         logger.info(f"TOKEN ARRIVATO {token}")
         logger.info(f"PAYLOAD {payload}")
+
+        #change for google
+        payload["id"] = int(payload.get("sub", 0))
         return payload
         #username: str = payload.get("sub")
         #if username is None:
