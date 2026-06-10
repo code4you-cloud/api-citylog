@@ -42,6 +42,10 @@ class EmailDataUpdate(BaseModel):  # Nuovo schema per PUT (aggiornamenti parzial
 class SegnalazioneStatusUpdate(BaseModel):
     status: Optional[str] = None
 
+class GoogleAuthRequest(BaseModel):
+    provider: Optional[str] = None
+    google_token: str
+
 class EmailData(EmailDataBase):
     id: int
     image_time: datetime
