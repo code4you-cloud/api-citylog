@@ -23,6 +23,8 @@ from slowapi.util import get_remote_address
 from datetime import timedelta
 from sqlalchemy import func
 from urllib.parse import urlparse
+# rate_limit
+from services_rate_limit import check_and_increment_rate_limit
 
 # -----------------------------
 # COSTANTI GLOBALI
@@ -58,6 +60,9 @@ async def create_rifiuti(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token non valido"
         )
+
+    # 1. Controlla e aggiorna rate limit (prima di creare la segnalazione)
+    check_and_increment_rate_limit(db, user_id, limit=5)
 
     db_item = EmailDataModel(
         **item.dict(exclude={"typo", "user_id", "id", "image_time"}),
