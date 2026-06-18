@@ -43,7 +43,7 @@ Questa guida fornisce una panoramica completa degli endpoint dell'API Citylog, b
 ```bash
 curl -X POST "http://192.168.1.159:8000/auth/token" \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "username=admin&password=secret"
+  -d "username=admin@example.com&password=secret"
 ```
 
 **Risposta Esempio**:
@@ -218,6 +218,19 @@ curl -X POST "http://192.168.1.159:8000/rifiuti/" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -H "Content-Type: application/json" \
   -d '{"lat": 45.5210772, "lon": 10.21249526, "address": "Via Nuova", "data": "2023-10-02", "image_url": "https://example.com/new.jpg"}'
+
+curl -X POST "https://api.citylog.cloud/rifiuti/" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MTUsInVzZXJuYW1lIjoiTWFyY28iLCJlbWFpbCI6Im1hcmNvQGV4YW1wbGUuY29tIiwiZXhwIjoxNzgxNTU3MTU4fQ.5zYR0qZE0pGdmX1abicEFmnSsyC71UYrlooC3b0tP7Q" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "latitude": "45.5210772",
+    "longitude": "10.21249526",
+    "city": "Verona",
+    "address": "Via Nuova, 1",
+    "image_id": "test_002",
+    "image_url": "https://dummyjson.com/image/100x100/808080/ffffff?text=curl&fontFamily=Cairo&fontSize=20",
+    "status": "Curl"
+  }'
 ```
 
 ### Ottieni Record Rifiuti per ID

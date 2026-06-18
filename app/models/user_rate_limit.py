@@ -21,6 +21,7 @@ class UserRateLimit(Base):
     )
 
     count = Column(Integer, default=0)
+    sent = Column(Integer, default=0)
     is_banned = Column(Boolean, default=False)
     ban_reason = Column(Text, nullable=True)
     banned_until = Column(DateTime, nullable=True)

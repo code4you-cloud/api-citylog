@@ -16,6 +16,31 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("id")
+        if user_id is None:
+            # Per compatibilità con token che usano 'sub'
+            user_id = payload.get("sub")
+            if user_id is not None:
+                user_id = int(user_id)
+        if user_id is None:
+            raise credentials_exception
+
+        return {
+            "id": user_id,
+            "username": payload.get("username"),
+            "email": payload.get("email"),
+        }
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+async def get_current_user_(token: str = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid authentication credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         logger.info(f"SECRET VERIFY -> {SECRET_KEY}")
         logger.info(f"VERIFY ALG -> {ALGORITHM}")
         logger.info(f"JWT OK -> {payload}")

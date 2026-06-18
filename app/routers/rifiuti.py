@@ -23,8 +23,10 @@ from slowapi.util import get_remote_address
 from datetime import timedelta
 from sqlalchemy import func
 from urllib.parse import urlparse
-# rate_limit
+
+# worrkflow rate_limit
 from services_rate_limit import check_and_increment_rate_limit
+from config import MAX_REPORT_LIMIT
 
 # -----------------------------
 # COSTANTI GLOBALI
@@ -62,12 +64,13 @@ async def create_rifiuti(
         )
 
     # 1. Controlla e aggiorna rate limit (prima di creare la segnalazione)
-    check_and_increment_rate_limit(db, user_id, limit=5)
+    check_and_increment_rate_limit(db, user_id, MAX_REPORT_LIMIT)
 
     db_item = EmailDataModel(
-        **item.dict(exclude={"typo", "user_id", "id", "image_time"}),
+        **item.dict(exclude={"typo", "user_id", "id", "image_time", "status"}),
         typo="rifiuti",
-        user_id=user_id
+        user_id=user_id,
+        status="api-city-log-cloud_create-rifiuto"   # <-- aggiungi questa riga
     )
 
     db.add(db_item)

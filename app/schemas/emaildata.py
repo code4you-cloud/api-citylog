@@ -24,7 +24,7 @@ class EmailDataCreate(EmailDataBase):
     image_id: Optional[str] = None
     image_url: Optional[str] = None
     image_file: Optional[str] = None
-    status: Optional[str] = None
+    #status: Optional[str] = None
     #pass
 
 class EmailDataUpdate(BaseModel):  # Nuovo schema per PUT (aggiornamenti parziali)

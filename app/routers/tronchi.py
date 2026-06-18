@@ -18,6 +18,10 @@ from typing import List, Optional
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 
+# worrkflow rate_limit
+from services_rate_limit import check_and_increment_rate_limit
+from config import MAX_REPORT_LIMIT
+
 router = APIRouter(prefix="/tronchi", tags=["Tronchi"])
 
 # Inizializza il logger
@@ -39,6 +43,9 @@ async def create_tronchi(
     db_user = db.query(UserModel).filter(UserModel.email == current_user["username"]).first()
     if not db_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utente non trovato")
+
+    # 1. Controlla e aggiorna rate limit (prima di creare la segnalazione)
+    check_and_increment_rate_limit(db, user_id, MAX_REPORT_LIMIT)
 
     db_item = EmailDataModel(**item.dict(), typo="tronchi", user_id=db_user.id)
     db.add(db_item)
