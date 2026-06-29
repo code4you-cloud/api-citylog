@@ -2,6 +2,7 @@ import re
 import os
 import requests
 import asyncio
+import traceback
 
 from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlalchemy.orm import Session
@@ -53,9 +54,30 @@ async def create_rifiuti(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    logger.info(f"current_user: {current_user}")
-    user_id = current_user.get("id")
-    logger.info(f"user_id estratto: {user_id}")
+    # USA user_id DAL PAYLOAD, NON dal token
+    print(f"item user_id: {item.user_id}")
+    user_id = item.user_id  # Prendi dal payload inviato da Django
+    print(f"user_id: {user_id}")
+    logger.warning("=" * 60)
+    logger.warning(f"TOKEN USER : {current_user['id']}")
+    logger.warning(f"PAYLOAD    : {item.dict()}")
+    logger.warning(f"ITEM.USER  : {item.user_id}")
+    logger.warning("=" * 60)
+
+    #logger.info(f"current_user: {current_user}")
+    #user_id = current_user.get("id")
+    #logger.info(f"user_id estratto: {user_id}")
+
+    # 1. Log dell'utente dal token
+    logger.warning(f"[TRACE] current_user dal token: {current_user}")
+    logger.warning(f"[TRACE] current_user.get('id'): {current_user.get('id') if current_user else 'None'}")
+
+    # 2. Log del payload ricevuto
+    logger.warning(f"[TRACE] item (payload): {item}")
+    logger.warning(f"[TRACE] item.user_id: {item.user_id}")
+
+    # 3. Log dello stack delle chiamate (per vedere chi sta chiamando l'endpoint)
+    #logger.warning(f"🔍 [TRACE] Stack trace:\n{''.join(traceback.format_stack())}")
 
     if not user_id:
         raise HTTPException(
@@ -64,7 +86,13 @@ async def create_rifiuti(
         )
 
     # 1. Controlla e aggiorna rate limit (prima di creare la segnalazione)
-    check_and_increment_rate_limit(db, user_id, MAX_REPORT_LIMIT)
+    logger.warning(f"[RATE LIMIT ENDPOINT] user_id={user_id}")
+    rate_limit = check_and_increment_rate_limit(db, user_id)
+    logger.warning(f"Rate limit dopo incremento: sent={rate_limit.sent}")
+    logger.warning(
+        f"[RATE LIMIT ENDPOINT] sent={rate_limit.sent}/{MAX_REPORT_LIMIT}"
+    )
+    #check_and_increment_rate_limit(db, user_id, MAX_REPORT_LIMIT)
 
     db_item = EmailDataModel(
         **item.dict(exclude={"typo", "user_id", "id", "image_time", "status"}),
@@ -73,9 +101,17 @@ async def create_rifiuti(
         status="api-city-log-cloud_create-rifiuto"   # <-- aggiungi questa riga
     )
 
-    db.add(db_item)
-    db.commit()
-    db.refresh(db_item)
+    try:
+        db.add(db_item)
+        db.commit()
+        db.refresh(db_item)
+
+    except Exception:
+        #logger.exception("Errore durante il salvataggio della segnalazione")
+        print("=" * 80)
+        traceback.print_exc()
+        print("=" * 80)
+        raise
 
     logger.info(
         f"Creato record rifiuti con ID {db_item.id} da utente {current_user.get('email')}"

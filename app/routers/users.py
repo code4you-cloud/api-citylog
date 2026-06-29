@@ -124,16 +124,16 @@ def get_my_rate_limit(
             is_banned=False,
             updated_at=datetime.utcnow()
         )
-
-    return UserRateLimitResponse(
-        user_id=user_id,       # e anche qui
-        count=rl.count,
-        sent=rl.sent,
-        is_banned=rl.is_banned,
-        ban_reason=rl.ban_reason,
-        banned_until=rl.banned_until,
-        updated_at=rl.updated_at
-    )
+    else:
+        return UserRateLimitResponse(
+            user_id=user_id,       # e anche qui
+            count=rl.count,        # limite massimo
+            sent=rl.sent,          # segnalazioni effettive
+            is_banned=rl.is_banned,
+            ban_reason=rl.ban_reason,
+            banned_until=rl.banned_until,
+            updated_at=rl.updated_at
+        )
 
 @router.get("/me/rate-limit_", response_model=UserRateLimitResponse)
 def get_my_rate_limit(
