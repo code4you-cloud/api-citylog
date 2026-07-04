@@ -18,6 +18,10 @@ from typing import List, Optional
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 
+# worrkflow rate_limit
+from services_rate_limit import check_and_increment_rate_limit
+from config import MAX_REPORT_LIMIT
+
 router = APIRouter(prefix="/tronchi", tags=["Tronchi"])
 
 # Inizializza il logger
@@ -36,11 +40,23 @@ async def create_tronchi(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    db_user = db.query(UserModel).filter(UserModel.email == current_user["username"]).first()
-    if not db_user:
+    user_id = item.user_id
+    #db_user = db.query(UserModel).filter(UserModel.email == current_user["username"]).first()
+    if not user_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utente non trovato")
 
-    db_item = EmailDataModel(**item.dict(), typo="tronchi", user_id=db_user.id)
+    # 1. Controlla e aggiorna rate limit (prima di creare la segnalazione)
+    check_and_increment_rate_limit(db, user_id)
+    #check_and_increment_rate_limit(db, user_id, MAX_REPORT_LIMIT)
+
+    db_item = EmailDataModel(
+        **item.dict(exclude={"typo", "user_id", "id", "image_time", "status"}),
+        typo="tronchi",
+        user_id=user_id,
+        status="api-city-log-cloud_create-rifiuto"   # <-- aggiungi questa riga
+    )
+
+    #db_item = EmailDataModel(**item.dict(), typo="tronchi", user_id=db_user.id)
     db.add(db_item)
     db.commit()
     db.refresh(db_item)

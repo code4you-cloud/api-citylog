@@ -96,7 +96,8 @@ async def delete_segnalazione(
     db: Session = Depends(get_db)
 ):
 
-    user_id = int(current_user["sub"])
+    user_id = current_user.get("id")
+    #user_id = int(current_user["sub"])
 
     db_item = db.query(EmailDataModel).filter(
         EmailDataModel.id == id,
