@@ -18,26 +18,28 @@ help:
 	@echo "$(GREEN)=== Makefile API Client ===$(NC)"
 	@echo "Targets disponibili:"
 	@echo "  $(GREEN)help$(NC)        	 - Mostra questo help"
-	@echo "  $(GREEN)login$(NC)       	 - Login e ottieni token (salva in token.txt)"
+	@echo "  $(GREEN)login$(NC)       	 - Login e ottieni token (HTTPie)"
 	@echo "  $(GREEN)test$(NC)        	 - Test connessione API"
 	@echo "  $(GREEN)get-rifiuti$(NC) 	 - Ottieni lista rifiuti"
-	@echo "  $(GREEN)create-rifiuto$(NC) - Crea nuovo rifiuto (usa token salvato)"
+	@echo "  $(GREEN)create-rifiuto$(NC) - Crea nuovo rifiuto"
 	@echo "  $(GREEN)clean$(NC)       	 - Pulisci file temporanei"
 	@echo "  $(GREEN)session-info$(NC)   - Info sessione"
 	@echo "  $(GREEN)curl-examples$(NC)  - Esempi con curl"
+	# Confronto tra con e senza auth
+test-comparison:
+	@echo "$(GREEN)=== Confronto endpoint ===$(NC)"
+	@echo "1. Con autenticazione:"
+	@make get-rifiuti || echo "Fallito (auth required)"
+	@echo ""
+	@echo "2. Senza autenticazione:"
+	@make test-no-auth
 
-# Login con HTTPie e salva token in file (senza sessione)
+# Login con HTTPie e salva session
 login:
 	@echo "$(GREEN)Effettuo login...$(NC)"
-	@http --form POST $(API_BASE)/auth/token \
+	http --session=$(SESSION_FILE) --form POST $(API_BASE)/auth/token \
 		username=$(USERNAME) password=$(PASSWORD) \
-		--check-status --body 2>/dev/null | jq -r '.access_token' > token.txt
-	@if [ ! -s token.txt ]; then \
-		echo "$(RED)Login fallito$(NC)"; \
-		rm -f token.txt; \
-		exit 1; \
-	fi
-	@echo "$(GREEN)Token salvato in token.txt$(NC)"
+		|| echo "$(RED)Login fallito$(NC)"
 
 # Test connessione base
 test:
@@ -50,42 +52,15 @@ test-no-auth:
 	@echo "$(GREEN)Test endpoint senza autenticazione...$(NC)"
 	http GET $(API_BASE)/rifiuti/no-auth
 
-# Ottieni lista rifiuti (usa token se disponibile, altrimenti fallisce)
+# Ottieni lista rifiuti
 get-rifiuti:
-	@if [ ! -f token.txt ]; then \
-		echo "$(RED)Token non trovato. Esegui prima 'make login'$(NC)"; \
-		exit 1; \
-	fi
-	@TOKEN=$$(cat token.txt); \
-	echo "$(GREEN)Recupero lista rifiuti...$(NC)"; \
-	http GET $(API_BASE)/rifiuti/ "Authorization: Bearer $$TOKEN"
+	@echo "$(GREEN)Recupero lista rifiuti...$(NC)"
+	http --session=$(SESSION_FILE) GET $(API_BASE)/rifiuti/
 
-# Crea nuovo rifiuto usando il token salvato
+# Crea nuovo rifiuto (esempio)
 create-rifiuto:
-	@if [ ! -f token.txt ]; then \
-		echo "$(RED)Token non trovato. Esegui prima 'make login'$(NC)"; \
-		exit 1; \
-	fi
-	@TOKEN=$$(cat token.txt); \
-	echo "$(GREEN)Creazione nuovo rifiuto...$(NC)"; \
-	http POST $(API_BASE)/rifiuti/ \
-		"Authorization: Bearer $$TOKEN" \
-		latitude="45.4642" \
-		longitude="9.1900" \
-		city="Milano" \
-		address="Via Roma 1" \
-		image_id="test_img_001" \
-		image_url="https://dummyjson.com/image/100x100/808080/ffffff?text=API&fontFamily=Cairo&fontSize=20"
-
-create-rifiuto-old:
-	@if [ ! -f token.txt ]; then \
-		echo "$(RED)Token non trovato. Esegui prima 'make login'$(NC)"; \
-		exit 1; \
-	fi
-	@TOKEN=$$(cat token.txt); \
-	echo "$(GREEN)Creazione nuovo rifiuto...$(NC)"; \
-	http POST $(API_BASE)/rifiuti/ \
-		"Authorization: Bearer $$TOKEN" \
+	@echo "$(GREEN)Creazione nuovo rifiuto...$(NC)"
+	http --session=$(SESSION_FILE) POST $(API_BASE)/rifiuti/ \
 		tipo="Plastica" \
 		quantita:=10 \
 		descrizione="Bottiglie di plastica"
@@ -111,7 +86,7 @@ session-info:
 		echo "Nessuna sessione attiva"; \
 	fi
 
-# Pulisci file temporanei (compreso token.txt)
+# Pulisci file temporanei
 clean:
 	@echo "$(GREEN)Pulizia file temporanei...$(NC)"
 	@rm -f $(SESSION_FILE) token.txt response.json
