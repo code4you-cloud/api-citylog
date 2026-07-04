@@ -388,7 +388,7 @@ description = "Cross-platform colored terminal text."
 optional = false
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,!=3.6.*,>=2.7"
 groups = ["main"]
-markers = "platform_system == \"Windows\""
+markers = "platform_system == \"Windows\" or sys_platform == \"win32\""
 files = [
     {file = "colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6"},
     {file = "colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44"},
@@ -697,6 +697,23 @@ files = [
     {file = "h11-0.16.0-py3-none-any.whl", hash = "sha256:63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86"},
     {file = "h11-0.16.0.tar.gz", hash = "sha256:4e35b956cf45792e4caa5885e69fba00bdbc6ffafbfa020300e549b208ee5ff1"},
 ]
+
+[[package]]
+name = "httpie"
+version = "0.9.8"
+description = "HTTPie - a CLI, cURL-like tool for humans."
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "httpie-0.9.8-py2.py3-none-any.whl", hash = "sha256:38fa941c7020af5adada9670494987c082051fef121db8874a2a136fd6e9eb47"},
+    {file = "httpie-0.9.8.tar.gz", hash = "sha256:515870b15231530f56fe2164190581748e8799b66ef0fe36ec9da3396f0df6e1"},
+]
+
+[package.dependencies]
+colorama = {version = ">=0.2.4", markers = "sys_platform == \"win32\""}
+Pygments = ">=2.1.3"
+requests = ">=2.11.0"
 
 [[package]]
 name = "idna"
@@ -1225,6 +1242,21 @@ files = [
 typing-extensions = ">=4.6.0,<4.7.0 || >4.7.0"
 
 [[package]]
+name = "pygments"
+version = "2.20.0"
+description = "Pygments is a syntax highlighting package written in Python."
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "pygments-2.20.0-py3-none-any.whl", hash = "sha256:81a9e26dd42fd28a23a2d169d86d7ac03b46e2f8b59ed4698fb4785f946d0176"},
+    {file = "pygments-2.20.0.tar.gz", hash = "sha256:6757cd03768053ff99f3039c1a36d6c0aa0b263438fcab17520b30a303a82b5f"},
+]
+
+[package.extras]
+windows-terminal = ["colorama (>=0.4.6)"]
+
+[[package]]
 name = "python-dotenv"
 version = "1.1.1"
 description = "Read key-value pairs from a .env file and set them as environment variables"
@@ -1697,4 +1729,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.9.2"
-content-hash = "3400de081c5d5c3bb7e764843e93f700b16cbafa57fcdb8dfe99c1ac5a4f3967"
+content-hash = "91cdeae4517937be82cf0642f66ce05a7c70a2cdcd5e47dad73f375834e1e2b2"

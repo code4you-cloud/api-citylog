@@ -5,6 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.db.database import Base, engine
 from app.logging_config import setup_logging
 
+from app.models.user_rate_limit import UserRateLimit
+
 # Inizializza il logging
 logger = setup_logging()
 
@@ -14,7 +16,7 @@ Base.metadata.create_all(bind=engine)
 # Crea l'app FastAPI
 app = FastAPI(
     title="FastAPI Project Citylog with JWT Auth",
-    description="API with authentication, rate limiting, endpoints for Rifiuti, Ambiente, Strade, Piantumazioni etc",
+    description="API with authentication, rate limiting, endpoints for Rifiuti, Ambiente, Strade, Piantumazioni -58",
     version="1.0.0"
     #redirect_slashes=False
 )
