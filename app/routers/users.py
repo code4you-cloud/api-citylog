@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.db.database import SessionLocal
 from app.models.user import User as UserModel
-from app.schemas.user import UserCreate, User
+from app.schemas.user import UserCreate, User, UserBase
 from app.auth.dependencies import get_current_user
 from app.auth.jwt_handler import get_password_hash
 
@@ -134,6 +134,71 @@ def get_my_rate_limit(
             banned_until=rl.banned_until,
             updated_at=rl.updated_at
         )
+
+@router.get("/me/rate-social")
+async def get_social_user(
+    user_id: int = None,  # Parametro opzionale
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # DEBUG: Mostra tutto il token
+    print(f"===== TOKEN DECODIFICATO =====")
+    print(f"current_user: {current_user}")
+    print(f"user_id passato: {user_id}")
+
+    # Se user_id Ãpassato, usalo (prioria)
+    if user_id is not None:
+        final_user_id = user_id
+        print(f"Usando user_id forzato: {final_user_id}")
+    else:
+        # Altrimenti usa l'utente dal token
+        final_user_id = current_user.get('id') or current_user.get('sub')
+        print(f"Usando user_id dal token: {final_user_id}")
+
+    if final_user_id is None:
+        raise HTTPException(status_code=401, detail="Token non valido")
+
+    print(f"Cerco user_id: {user_id}")
+
+    user = (
+        db.query(UserModel)
+        .filter(
+            UserModel.id == user_id
+        )
+        .first()
+    )
+
+    if not user:
+        raise HTTPException(status_code=404, detail="Utente non trovato")
+
+    print(f"Utente trovato: {user.id}")
+
+     # Usa user_db.username
+    username = user.username
+
+    if username.startswith('google_'):
+        social_type = "Google"
+        social_id = username[7:]  # Rimuove 'google_'
+    elif username.startswith('fb_'):
+        social_type = "Facebook"
+        social_id = username[3:]  # Rimuove 'fb_'
+    elif username.startswith('facebook_'):
+        social_type = "Facebook"
+        social_id = username[9:]  # Rimuove 'facebook_'
+    else:
+        social_type = "Email"
+        social_id = username
+
+    return {
+        "id": user.id,
+        "email": user.email,
+        "username": user.username,
+        "is_active": user.is_active,
+        "social_type": social_type,
+        "social_id": social_id,
+        "name": user.name,
+        "facebook_id": user.facebook_id
+    }
 
 @router.get("/me/rate-limit_", response_model=UserRateLimitResponse)
 def get_my_rate_limit(
