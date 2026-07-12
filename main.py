@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.routers import auth, users, rifiuti, tronchi, censimento, piantumazioni, strade, segnalazioni
+from app.routers import auth, users, rifiuti, tronchi, censimento, piantumazioni, strade, segnalazioni, quartieri
 from app.middlewares.rate_limiter import RateLimiterMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from app.db.database import Base, engine
@@ -54,6 +54,7 @@ app.include_router(tronchi.router)
 app.include_router(censimento.router)
 app.include_router(piantumazioni.router)
 app.include_router(strade.router)
+app.include_router(quartieri.router)
 
 @app.get("/", tags=["Root", "Health"])
 def root():
