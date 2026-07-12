@@ -11,7 +11,7 @@ from sqlalchemy.orm import sessionmaker
 
 # psql connector
 # Configura l'URL del database PostgreSQL
-SQLALCHEMY_DATABASE_URL = "postgresql://postgres:postgres123@192.168.1.65:5432/geodumbmail"
+SQLALCHEMY_DATABASE_URL = "postgresql://postgres:postgres123@192.168.1.65:5432/geodumbmail_alembic"
 
 # Crea il motore SQLAlchemy
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
