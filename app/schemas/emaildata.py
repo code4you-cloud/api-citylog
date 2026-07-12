@@ -15,6 +15,7 @@ class EmailDataBase(BaseModel):
     id: Optional[int] = None
     image_time: Optional[str] = None
     user_id: Optional[int] = None
+    quartiere: Optional[str] = None   # nuovo campo
 
 class EmailDataCreate(EmailDataBase):
     latitude: Optional[str] = None
