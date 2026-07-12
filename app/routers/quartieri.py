@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.db.database import SessionLocal
 from app.models.citylog import EmailData as EmailDataModel
 from app.models.user import User as UserModel
-from app.schemas.quartieri import QuartiereUpdateItem, QuartiereBatchUpdate
+from app.schemas.quartieri import QuartiereUpdateItem, QuartiereBatchUpdate, QuartiereResponse
 from app.auth.dependencies import get_current_user
 
 from app.middlewares.rate_limiter import RateLimiterMiddleware
@@ -42,6 +42,134 @@ def get_db():
         yield db
     finally:
         db.close()
+
+@router.get("/", response_model=List[QuartiereResponse])
+async def get_quartieri(
+    city: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)   # usa il tuo metodo di autenticazione
+):
+    """
+    Restituisce la lista dei quartieri con:
+    - numero totale di segnalazioni
+    - data dell'ultima segnalazione
+    - coordinate (prese dal primo record per quel quartiere)
+    """
+    try:
+        base_query = db.query(
+            EmailDataModel.quartiere,
+            func.count(EmailDataModel.id).label("totale"),
+            func.max(EmailDataModel.image_time).label("ultima_data"),
+            func.min(EmailDataModel.id).label("min_id")
+        ).filter(
+            EmailDataModel.quartiere.isnot(None),
+            EmailDataModel.quartiere != ""
+        )
+
+        # Se vuoi mostrare solo i quartieri delle segnalazioni dell'utente loggato:
+        # base_query = base_query.filter(EmailDataModel.user_id == current_user.id)
+
+        if city:
+            base_query = base_query.filter(EmailDataModel.city.ilike(f"%{city}%"))
+
+        aggregated = base_query.group_by(EmailDataModel.quartiere).all()
+
+        result = []
+        for row in aggregated:
+            quartiere_name = row.quartiere
+            totale = row.totale
+            ultima_data = row.ultima_data
+            min_id = row.min_id
+
+            # Recupera le coordinate dal record con ID minimo
+            record = db.query(EmailDataModel).filter(EmailDataModel.id == min_id).first()
+            lat = record.latitude if record else ""
+            lon = record.longitude if record else ""
+
+            data_str = ""
+            if ultima_data:
+                try:
+                    data_str = ultima_data.strftime("%Y-%m-%d")
+                except:
+                    data_str = str(ultima_data)[:10]
+
+            result.append(QuartiereResponse(
+                quartiere=quartiere_name,
+                segnalazioni_totali=totale,
+                ultima_segnalazione=data_str,
+                latitudine=lat,
+                longitudine=lon
+            ))
+
+        logger.info(f"Quartieri trovati: {len(result)}")
+        return result
+
+    except Exception as e:
+        logger.error(f"Errore nel recupero quartieri: {str(e)}")
+        raise HTTPException(status_code=500, detail="Errore interno del server")
+
+@router.get("/no-auth", response_model=List[QuartiereResponse])
+async def get_quartieri(
+    city: Optional[str] = None,
+    db: Session = Depends(get_db)
+    #current_user: User = Depends(get_current_user)   # usa il tuo metodo di autenticazione
+):
+    """
+    Restituisce la lista dei quartieri con:
+     - Versione di test senza autenticazione
+    """
+    try:
+        base_query = db.query(
+            EmailDataModel.quartiere,
+            func.count(EmailDataModel.id).label("totale"),
+            func.max(EmailDataModel.image_time).label("ultima_data"),
+            func.min(EmailDataModel.id).label("min_id")
+        ).filter(
+            EmailDataModel.quartiere.isnot(None),
+            EmailDataModel.quartiere != ""
+        )
+
+        # Se vuoi mostrare solo i quartieri delle segnalazioni dell'utente loggato:
+        # base_query = base_query.filter(EmailDataModel.user_id == current_user.id)
+
+        if city:
+            base_query = base_query.filter(EmailDataModel.city.ilike(f"%{city}%"))
+
+        aggregated = base_query.group_by(EmailDataModel.quartiere).all()
+
+        result = []
+        for row in aggregated:
+            quartiere_name = row.quartiere
+            totale = row.totale
+            ultima_data = row.ultima_data
+            min_id = row.min_id
+
+            # Recupera le coordinate dal record con ID minimo
+            record = db.query(EmailDataModel).filter(EmailDataModel.id == min_id).first()
+            lat = record.latitude if record else ""
+            lon = record.longitude if record else ""
+
+            data_str = ""
+            if ultima_data:
+                try:
+                    data_str = ultima_data.strftime("%Y-%m-%d")
+                except:
+                    data_str = str(ultima_data)[:10]
+
+            result.append(QuartiereResponse(
+                quartiere=quartiere_name,
+                segnalazioni_totali=totale,
+                ultima_segnalazione=data_str,
+                latitudine=lat,
+                longitudine=lon
+            ))
+
+        logger.info(f"Quartieri trovati: {len(result)}")
+        return result
+
+    except Exception as e:
+        logger.error(f"Errore nel recupero quartieri: {str(e)}")
+        raise HTTPException(status_code=500, detail="Errore interno del server")
 
 @router.post("/batch-update")
 async def batch_update_quartieri(
@@ -98,49 +226,6 @@ async def batch_update_quartieri(
 
     db.commit()
     print(f"DEBUG: commit eseguito. updated={updated}, not_found={not_found}")
-    return {"status": "ok", "updated": updated, "not_found": not_found}
-
-@router.post("/batch-update_last")
-async def batch_update_quartieri_last(
-    payload: QuartiereBatchUpdate,
-    db: Session = Depends(get_db)
-):
-    updated = 0
-    not_found = 0
-
-    for item in payload.updates:
-        record = None
-
-        # 1. Preferisci sempre l'ID (se fornito)
-        if item.id is not None:
-            record = db.query(EmailDataModel).filter(EmailDataModel.id == item.id).first()
-
-        # 2. Altrimenti cerca per coordinate (stringhe) e typo
-        elif item.latitudine is not None and item.longitudine is not None:
-            # Normalizza: arrotonda a 6 decimali e converti in stringa
-            try:
-                lat_str = f"{float(item.latitudine):.6f}"
-                lon_str = f"{float(item.longitudine):.6f}"
-            except ValueError:
-                not_found += 1
-                continue
-
-            record = db.query(EmailDataModel).filter(
-                and_(
-                    EmailDataModel.latitude == lat_str,
-                    EmailDataModel.longitude == lon_str,
-                    EmailDataModel.typo == item.typo
-                )
-            ).first()
-
-        if record:
-            record.quartiere = item.quartiere
-            db.flush()  # forza la scrittura senza commit finale
-            updated += 1
-        else:
-            not_found += 1
-
-    db.commit()
     return {"status": "ok", "updated": updated, "not_found": not_found}
 
 # con la/long real
