@@ -12,3 +12,10 @@ class QuartiereUpdateItem(BaseModel):
 
 class QuartiereBatchUpdate(BaseModel):
     updates: List[QuartiereUpdateItem]
+
+class QuartiereResponse(BaseModel):
+    quartiere: str
+    segnalazioni_totali: int
+    ultima_segnalazione: str       # data in formato "YYYY-MM-DD"
+    latitudine: str
+    longitudine: str
