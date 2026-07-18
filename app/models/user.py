@@ -20,3 +20,4 @@ class User(Base):
     name = Column(String)
     # Opzionale: per futuri provider
     google_id = Column(String(50), unique=True, index=True, nullable=True)
+    avatar_url = Column(String(255), nullable=True)  # Aggiungi questa riga

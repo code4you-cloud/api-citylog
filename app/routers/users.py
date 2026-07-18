@@ -53,13 +53,64 @@ async def read_current_user(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    db_user = db.query(UserModel).filter(UserModel.email == current_user["username"]).first()
+    db_user = db.query(UserModel).filter(UserModel.username == current_user["username"]).first()
+    #db_user = db.query(UserModel).filter(UserModel.email == current_user["username"]).first()
     if not db_user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    return db_user
+        raise HTTPException(404, "User not found")
+
+    # Costruisci manualmente l'oggetto User
+    return User(
+        id=db_user.id,
+        username=db_user.username,
+        email=db_user.email if db_user.email else None,  # se vuoto → None
+        name=db_user.name if db_user.name else None,
+        avatar_url=db_user.avatar_url if db_user.avatar_url else None,
+        is_active=db_user.is_active,
+        facebook_id=db_user.facebook_id if db_user.facebook_id else None
+    )
+
+#@router.get("/me", response_model=User)
+#async def read_current_user(
+#    current_user: dict = Depends(get_current_user),
+#    db: Session = Depends(get_db)
+#):
+#    # LOG 1: controlla cosa arriva dalla dependency
+#    logger.error(f"current_user ricevuto: {current_user}")
+#    logger.error(f"Tipo di current_user: {type(current_user)}")
+#    logger.error(f"Chiavi presenti: {current_user.keys() if isinstance(current_user, dict) else 'NON DICT'}")
+#
+#    db_user = db.query(UserModel).filter(UserModel.email == current_user["username"]).first()
+#    # LOG 2: controlla il risultato del DB
+#    logger.error(f"db_user trovato: {db_user}")
+#
+#    if not db_user:
+#        raise HTTPException(
+#            status_code=status.HTTP_404_NOT_FOUND,
+#            detail="User not found"
+#        )
+#    # LOG 3: controlla cosa stai per restituire (prima della validazione response_model)
+#    logger.error(f"Oggetto restituito: {db_user} - Type: {type(db_user)}")
+#    return db_user
+#
+@router.get("/{user_id}", response_model=User)
+async def get_user_by_id(user_id: int, db: Session = Depends(get_db)):
+    db_user = db.query(UserModel).filter(UserModel.id == user_id).first()
+    if not db_user:
+        raise HTTPException(404, "User not found")
+
+    # Se email  None o vuota, restituisci None
+    email = db_user.email if db_user.email else None
+
+    # Restituisci un oggetto User con email opzionale
+    return User(
+        id=db_user.id,
+        username=db_user.username,
+        email=db_user.email if db_user.email else None,  # se vuoto None
+        name=db_user.name,
+        avatar_url=db_user.avatar_url,
+        is_active=db_user.is_active
+    )
+
 
 @router.get("/me/segnalazioni", response_model=list[SegnalazioneOut])
 def get_my_segnalazioni(
@@ -72,7 +123,7 @@ def get_my_segnalazioni(
     # Tentativo con diverse chiavi
     user_id = current_user.get('id') or current_user.get('sub') or current_user.get('user_id')
     if user_id is None:
-        # Se è un oggetto, prova attributo
+        # Se un oggetto, prova attributo
         if hasattr(current_user, 'id'):
             user_id = current_user.id
         else:
@@ -129,7 +180,7 @@ async def get_social_user(
     print(f"current_user: {current_user}")
     print(f"user_id passato: {user_id}")
 
-    # Se user_id �passato, usalo (prioria)
+    # Se user_id passato, usalo (prioria)
     if user_id is not None:
         final_user_id = user_id
         print(f"Usando user_id forzato: {final_user_id}")
