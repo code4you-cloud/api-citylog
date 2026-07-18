@@ -87,23 +87,6 @@ def get_my_segnalazioni(
     )
     return segnalazioni
 
-@router.get("/me/segnalazioni_", response_model=list[SegnalazioneOut])
-def get_my_segnalazioni(
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
-):
-    user_id = current_user.get('id') or current_user.get('sub')
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Token non valido")
-
-    segnalazioni = (
-        db.query(EmailDataModel)
-        .filter(EmailDataModel.user_id == user_id)
-        .order_by(EmailDataModel.image_time.desc())
-        .all()
-    )
-    return segnalazioni
-
 @router.get("/me/rate-limit", response_model=UserRateLimitResponse)  # attenzione: non list
 def get_my_rate_limit(
     current_user: dict = Depends(get_current_user),
@@ -200,42 +183,3 @@ async def get_social_user(
         "facebook_id": user.facebook_id
     }
 
-@router.get("/me/rate-limit_", response_model=UserRateLimitResponse)
-def get_my_rate_limit(
-    current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    user_id = current_user.get('id') or current_user.get('sub')
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Token non valido")
-
-    rl = (
-        db.query(UserRateLimit)
-        .filter(
-            UserRateLimit.user_id == user_id
-        )
-        .first()
-    )
-
-    if not rl:
-        return UserRateLimitResponse(
-            user_id=current_user.id,
-            report_count=0,
-            limit=5,
-            remaining=5,
-            is_banned=False,
-            updated_at=datetime.utcnow()
-        )
-
-    return UserRateLimitResponse(
-        user_id=current_user.id,
-        report_count=rl.count,
-        limit=5,
-        remaining=max(0, 5 - rl.count),
-
-        is_banned=rl.is_banned,
-        ban_reason=rl.ban_reason,
-        banned_until=rl.banned_until,
-
-        updated_at=rl.updated_at
-    )

@@ -173,68 +173,18 @@ async def get_quartieri_no_auth(
         logger.error(f"Errore recupero quartieri: {str(e)}")
         raise HTTPException(status_code=500, detail="Errore interno del server")
 
-@router.get("/no-auth_", response_model=List[QuartiereResponse])
-async def get_quartieri_(
-    city: Optional[str] = None,
+@router.get("/segnalazioni-quartiere")
+async def get_segnalazioni_by_quartiere(
+    quartiere: str,
     db: Session = Depends(get_db)
-    #current_user: User = Depends(get_current_user)   # usa il tuo metodo di autenticazione
+    #current_user: User = Depends(get_current_user)
 ):
-    """
-    Restituisce la lista dei quartieri con:
-     - Versione di test senza autenticazione
-    """
-    try:
-        base_query = db.query(
-            EmailDataModel.quartiere,
-            func.count(EmailDataModel.id).label("totale"),
-            func.max(EmailDataModel.image_time).label("ultima_data"),
-            func.min(EmailDataModel.id).label("min_id")
-        ).filter(
-            EmailDataModel.quartiere.isnot(None),
-            EmailDataModel.quartiere != ""
-        )
+    records = db.query(EmailDataModel).filter(
+        EmailDataModel.quartiere.ilike(f"%{quartiere}%")
+        #EmailDataModel.user_id == current_user.id   # opzionale
+    ).order_by(EmailDataModel.image_time.desc()).all()
 
-        # Se vuoi mostrare solo i quartieri delle segnalazioni dell'utente loggato:
-        # base_query = base_query.filter(EmailDataModel.user_id == current_user.id)
-
-        if city:
-            base_query = base_query.filter(EmailDataModel.city.ilike(f"%{city}%"))
-
-        aggregated = base_query.group_by(EmailDataModel.quartiere).all()
-
-        result = []
-        for row in aggregated:
-            quartiere_name = row.quartiere
-            totale = row.totale
-            ultima_data = row.ultima_data
-            min_id = row.min_id
-
-            # Recupera le coordinate dal record con ID minimo
-            record = db.query(EmailDataModel).filter(EmailDataModel.id == min_id).first()
-            lat = record.latitude if record else ""
-            lon = record.longitude if record else ""
-
-            data_str = ""
-            if ultima_data:
-                try:
-                    data_str = ultima_data.strftime("%Y-%m-%d")
-                except:
-                    data_str = str(ultima_data)[:10]
-
-            result.append(QuartiereResponse(
-                quartiere=quartiere_name,
-                segnalazioni_totali=totale,
-                ultima_segnalazione=data_str,
-                latitudine=lat,
-                longitudine=lon
-            ))
-
-        logger.info(f"Quartieri trovati: {len(result)}")
-        return result
-
-    except Exception as e:
-        logger.error(f"Errore nel recupero quartieri: {str(e)}")
-        raise HTTPException(status_code=500, detail="Errore interno del server")
+    return records
 
 @router.post("/batch-update")
 async def batch_update_quartieri(
