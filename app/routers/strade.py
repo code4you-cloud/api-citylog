@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.db.database import SessionLocal
 from app.models.citylog import EmailData as EmailDataModel
 from app.models.user import User as UserModel
+from app.models.redaction_box_model import RedactionBoxModel
 from app.schemas.emaildata import EmailData, EmailDataCreate, EmailDataUpdate
 from app.auth.dependencies import get_current_user
 from app.logging_config import setup_logging
@@ -20,13 +21,14 @@ from typing import List, Optional
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 
-# worrkflow rate_limit
+# RATE_LIMIT worrkflow
 from services_rate_limit import check_and_increment_rate_limit
-from config import MAX_REPORT_LIMIT
+from config import MAX_REPORT_LIMIT, REMOTE_UPLOAD_URL, REMOTE_MEDIA_URL, AUTO_REDACT_THRESHOLD, REDACTED_OUTPUT_DIR
 
-# ANTHROPIC and face and plating detect
+# ANTHROPIC and face and plating workflow detect
 from config import ENABLE_ANTROPIC
-from app.services.detection import detect_sensitive_regions
+from app.services.detection import detect_sensitive_regions, resolve_image_path
+from app.services.redaction import apply_redaction_simple, upload_redacted_to_remote, build_redacted_filename, redact_and_swap
 
 router = APIRouter(prefix="/strade", tags=["Strade"])
 
@@ -46,54 +48,71 @@ async def create_strade(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-
     user_id = item.user_id
-    #db_user = db.query(UserModel).filter(UserModel.email == current_user["username"]).first()
     if not user_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utente non trovato")
 
-    # 1. Controlla e aggiorna rate limit (prima di creare la segnalazione)
     check_and_increment_rate_limit(db, user_id)
-    #check_and_increment_rate_limit(db, user_id, MAX_REPORT_LIMIT)
 
     db_item = EmailDataModel(
         **item.dict(exclude={"typo", "user_id", "id", "image_time", "status"}),
         typo="strade",
         user_id=user_id,
-        status="api-city-log-cloud_create-rifiuto"   # <-- aggiungi questa riga
+        status="api-city-log-cloud_create-rifiuto"
     )
 
-    #db_item = EmailDataModel(**item.dict(), typo="strade", user_id=db_user.id)
     db.add(db_item)
     db.commit()
     db.refresh(db_item)
     logger.info(f"Creato record strade con ID {db_item.id} da utente {current_user['username']}")
 
-    # --- HOOK: analisi immagine + scrittura status_int ---
+    # --- HOOK: analisi immagine + redazione automatica + scrittura status_int ---
     if ENABLE_ANTROPIC:
-        print(os.getcwd())  # da dove gira il processo FastAPI
-        print(os.path.exists(db_item.image_file))  # prova path relativo così com'è
-        #full_path = os.path.join(MEDIA_ROOT, db_item.image_file)
         try:
-            regions = detect_sensitive_regions(db_item.image_file)
+            image_path = resolve_image_path(db_item)
+            regions = detect_sensitive_regions(image_path)
         except Exception:
             logger.exception(f"Detection fallita per record {db_item.id}")
-            db_item.status_int = 50  # ERROR o la costante corrispondente
+            db_item.status_int = 50  # ERROR
         else:
             if regions:
-                db_item.status_int = 40  # FLAGGED
+                all_high_conf = all(r.get('confidence', 0) >= AUTO_REDACT_THRESHOLD for r in regions)
+
+                new_boxes = []
                 for r in regions:
                     box = RedactionBoxModel(
                         report_id=db_item.id,
                         box_type=r['type'],
                         x=r['x'], y=r['y'], w=r['w'], h=r['h'],
                         confidence=r.get('confidence', 1.0),
-                        confirmed=False,
+                        confirmed=all_high_conf,
                         is_manual=False,
                     )
                     db.add(box)
+                    new_boxes.append(box)
+
+                if all_high_conf:
+                    db.flush()  # popola gli id dei box prima della redazione
+                    try:
+                        local_redacted_path = apply_redaction_simple(
+                            image_path, new_boxes, output_dir=REDACTED_OUTPUT_DIR, report_id=db_item.id
+                        )
+                        original_filename = db_item.image_url.split('/')[-1]
+
+                        original_backup_url = redact_and_swap(
+                            image_path, local_redacted_path, original_filename,
+                            upload_base_url=REMOTE_UPLOAD_URL, media_base_url=REMOTE_MEDIA_URL
+                        )
+
+                        db_item.redacted_image = original_backup_url  # ora traccia l'ORIGINALE preservato, non la redatta
+                        db_item.status_int = 20  # PUBLISHED, redatto automaticamente
+                    except Exception:
+                        logger.exception(f"Redazione automatica fallita per record {db_item.id}")
+                        db_item.status_int = 40  # fallback: richiede revisione umana
+                else:
+                    db_item.status_int = 40  # FLAGGED, confidence non abbastanza alta
             else:
-                db_item.status_int = 20  # PUBLISHED
+                db_item.status_int = 20  # PUBLISHED, nessun elemento sensibile
 
         db.commit()
         db.refresh(db_item)

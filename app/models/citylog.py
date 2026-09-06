@@ -24,3 +24,4 @@ class EmailData(Base):
     quartiere = Column(String(255), nullable=True)
 
     user = relationship("User", back_populates="emaildata")
+    redacted_image = Column(String(255), nullable=True)
