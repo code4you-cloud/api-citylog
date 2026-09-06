@@ -1,3 +1,6 @@
+import os
+from dotenv import load_dotenv
+
 from fastapi import FastAPI
 from app.routers import auth, users, rifiuti, tronchi, censimento, piantumazioni, strade, segnalazioni, quartieri
 from app.middlewares.rate_limiter import RateLimiterMiddleware

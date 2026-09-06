@@ -1,3 +1,5 @@
+import os
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.db.database import SessionLocal
@@ -21,6 +23,10 @@ from slowapi.util import get_remote_address
 # worrkflow rate_limit
 from services_rate_limit import check_and_increment_rate_limit
 from config import MAX_REPORT_LIMIT
+
+# ANTHROPIC and face and plating detect
+from config import ENABLE_ANTROPIC
+from app.services.detection import detect_sensitive_regions
 
 router = APIRouter(prefix="/strade", tags=["Strade"])
 
@@ -62,6 +68,37 @@ async def create_strade(
     db.commit()
     db.refresh(db_item)
     logger.info(f"Creato record strade con ID {db_item.id} da utente {current_user['username']}")
+
+    # --- HOOK: analisi immagine + scrittura status_int ---
+    if ENABLE_ANTROPIC:
+        print(os.getcwd())  # da dove gira il processo FastAPI
+        print(os.path.exists(db_item.image_file))  # prova path relativo così com'è
+        #full_path = os.path.join(MEDIA_ROOT, db_item.image_file)
+        try:
+            regions = detect_sensitive_regions(db_item.image_file)
+        except Exception:
+            logger.exception(f"Detection fallita per record {db_item.id}")
+            db_item.status_int = 50  # ERROR o la costante corrispondente
+        else:
+            if regions:
+                db_item.status_int = 40  # FLAGGED
+                for r in regions:
+                    box = RedactionBoxModel(
+                        report_id=db_item.id,
+                        box_type=r['type'],
+                        x=r['x'], y=r['y'], w=r['w'], h=r['h'],
+                        confidence=r.get('confidence', 1.0),
+                        confirmed=False,
+                        is_manual=False,
+                    )
+                    db.add(box)
+            else:
+                db_item.status_int = 20  # PUBLISHED
+
+        db.commit()
+        db.refresh(db_item)
+    # -- END HOOK
+
     return db_item
 
 @router.get("/no-auth", response_model=List[EmailData])
